@@ -1,6 +1,7 @@
 import streamlit as st
 import boto3
 from botocore.exceptions import NoCredentialsError
+from transformers import pipeline
 
 def get_s3_logs(bucket_name, access_key, secret_key):
     logs = []
@@ -19,6 +20,18 @@ def get_s3_logs(bucket_name, access_key, secret_key):
 
     return logs
 
+def analyze_logs(logs):
+    # Use a pre-trained model for text summarization
+    summarizer = pipeline("summarization")
+    solutions = []
+
+    for log in logs:
+        # Summarize each log to extract key information
+        summary = summarizer(log.decode("utf-8"), max_length=100, min_length=5, length_penalty=2.0, num_beams=4, early_stopping=True)
+        solutions.append(summary[0]['summary'])
+
+    return solutions
+
 def main():
     st.title("S3 Log Viewer")
 
@@ -32,8 +45,16 @@ def main():
     if st.button("View Logs"):
         if bucket_name and access_key and secret_key:
             logs = get_s3_logs(bucket_name, access_key, secret_key)
-            for log in logs:
-                st.text(log)
+            
+            if logs:
+                solutions = analyze_logs(logs)
+                for log, solution in zip(logs, solutions):
+                    st.subheader("Log:")
+                    st.text(log.decode("utf-8"))
+                    st.subheader("Solution:")
+                    st.text(solution)
+            else:
+                st.warning("No logs found in the specified S3 bucket.")
         else:
             st.warning("Please enter all required information.")
 
